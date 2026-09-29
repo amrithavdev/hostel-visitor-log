@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visitor Check-in — Hostel Visitor Log</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav>
+  <span class="brand">🏠 Hostel Visitor Log</span>
+  <a href="index.html">Dashboard</a>
+  <a href="residents.html">Residents</a>
+  <a href="checkin.html" class="active">Visitor Check-in</a>
+  <a href="visitors.html">Visitor Records</a>
+</nav>
+
+<div class="page">
+  <h1>Visitor Check-in</h1>
+  <p class="subtitle">Record a new visitor entering the hostel.</p>
+
+  <div class="section">
+    <h2>Check-in Form</h2>
+
+    <div id="checkinMsg" class="msg"></div>
+
+    <div class="form-group">
+      <label for="visitorName">Visitor Name</label>
+      <input type="text" id="visitorName" placeholder="Enter visitor's full name" />
+    </div>
+
+    <div class="form-group">
+      <label for="purpose">Purpose of Visit</label>
+      <input type="text" id="purpose" placeholder="e.g. Birthday celebration, family visit" />
+    </div>
+
+    <div class="form-group">
+      <label for="residentSelect">Resident to Visit</label>
+      <select id="residentSelect">
+        <option value="">-- Loading residents... --</option>
+      </select>
+    </div>
+
+    <button class="btn btn-primary" onclick="checkIn()">Record Check-in</button>
+  </div>
+
+  <div class="section">
+    <h2>Note</h2>
+    <p style="font-size:14px; color:#555; line-height:1.7;">
+      Check-in time is recorded automatically by the database at the moment of submission.
+      You do not need to enter it manually.
+      After check-in, you can view and manage the visitor on the
+      <a href="visitors.html" style="color:#1a237e;">Visitor Records</a> page.
+    </p>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:3000';
+
+  function showMsg(id, text, type) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'msg ' + type + ' show';
+    setTimeout(() => { el.className = 'msg'; }, 4000);
+  }
+
+  // ── LOAD RESIDENTS INTO DROPDOWN ──
+  async function loadResidentDropdown() {
+    const select = document.getElementById('residentSelect');
+    try {
+      const res  = await fetch(API + '/api/residents');
+      const data = await res.json();
+
+      if (!Array.isArray(data) || data.length === 0) {
+        select.innerHTML = '<option value="">-- No residents found. Add residents first. --</option>';
+        return;
+      }
+
+      select.innerHTML = '<option value="">-- Select a resident --</option>' +
+        data.map(r =>
+          `<option value="${r.resident_id}">${r.name} — Room ${r.room_no}</option>`
+        ).join('');
+
+    } catch (err) {
+      select.innerHTML = '<option value="">-- Failed to load residents --</option>';
+    }
+  }
+
+  // ── SUBMIT CHECK-IN ──
+  async function checkIn() {
+    const visitor_name  = document.getElementById('visitorName').value.trim();
+    const purpose       = document.getElementById('purpose').value.trim();
+    const resident_id   = parseInt(document.getElementById('residentSelect').value);
+
+    if (!visitor_name) {
+      showMsg('checkinMsg', 'Please enter the visitor name.', 'error');
+      return;
+    }
+    if (!purpose) {
+      showMsg('checkinMsg', 'Please enter the purpose of visit.', 'error');
+      return;
+    }
+    if (!resident_id) {
+      showMsg('checkinMsg', 'Please select a resident.', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch(API + '/api/visitors', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ visitor_name, purpose, resident_id })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        showMsg('checkinMsg', 'Visitor checked in successfully! Visitor ID: ' + data.visitor_id, 'success');
+        document.getElementById('visitorName').value = '';
+        document.getElementById('purpose').value     = '';
+        // Keep the dropdown so next check-in is faster
+      } else {
+        showMsg('checkinMsg', data.error || 'Check-in failed.', 'error');
+      }
+
+    } catch (err) {
+      showMsg('checkinMsg', 'Network error. Is the backend running?', 'error');
+    }
+  }
+
+  loadResidentDropdown();
+</script>
+
+</body>
+</html>

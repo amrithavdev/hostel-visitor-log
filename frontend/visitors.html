@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visitor Records — Hostel Visitor Log</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav>
+  <span class="brand">🏠 Hostel Visitor Log</span>
+  <a href="index.html">Dashboard</a>
+  <a href="residents.html">Residents</a>
+  <a href="checkin.html">Visitor Check-in</a>
+  <a href="visitors.html" class="active">Visitor Records</a>
+</nav>
+
+<div class="page">
+  <h1>Visitor Records</h1>
+  <p class="subtitle">View current visitors, search history, and manage records.</p>
+
+  <!-- SECTION A: CURRENT VISITORS -->
+  <div class="section">
+    <h2>Currently Inside</h2>
+    <div id="currentMsg" class="msg"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Visitor Name</th>
+            <th>Purpose</th>
+            <th>Resident</th>
+            <th>Room</th>
+            <th>Check-in Time</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="currentTbody">
+          <tr class="empty-row"><td colspan="6">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SECTION B: VISITOR HISTORY -->
+  <div class="section">
+    <h2>Visitor History</h2>
+
+    <div class="search-bar">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search visitor, purpose, resident or room..."
+        onkeydown="if(event.key==='Enter') searchVisitors()"
+      />
+      <button class="btn btn-secondary" onclick="searchVisitors()">Search</button>
+      <button class="btn btn-secondary" onclick="clearSearch()">Clear</button>
+    </div>
+
+    <div id="historyMsg" class="msg"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Visitor Name</th>
+            <th>Purpose</th>
+            <th>Resident</th>
+            <th>Room</th>
+            <th>Check-in</th>
+            <th>Check-out</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="historyTbody">
+          <tr class="empty-row"><td colspan="8">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:3000';
+
+  function showMsg(id, text, type) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'msg ' + type + ' show';
+    setTimeout(() => { el.className = 'msg'; }, 4000);
+  }
+
+  function formatDateTime(dt) {
+    if (!dt) return '—';
+    const d = new Date(dt);
+    return d.toLocaleDateString('en-IN') + ' ' +
+           d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── LOAD CURRENT VISITORS ──
+  async function loadCurrent() {
+    const tbody = document.getElementById('currentTbody');
+    try {
+      const res  = await fetch(API + '/api/visitors/current');
+      const data = await res.json();
+
+      if (!Array.isArray(data) || data.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No visitors currently inside.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(v => `
+        <tr>
+          <td>${v.visitor_name}</td>
+          <td>${v.purpose}</td>
+          <td>${v.resident_name}</td>
+          <td>${v.room_no}</td>
+          <td>${formatDateTime(v.check_in)}</td>
+          <td>
+            <button class="btn btn-success" onclick="checkout(${v.visitor_id})">Check Out</button>
+          </td>
+        </tr>
+      `).join('');
+
+    } catch (err) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Failed to load current visitors.</td></tr>';
+    }
+  }
+
+  // ── LOAD FULL HISTORY ──
+  async function loadHistory() {
+    const tbody = document.getElementById('historyTbody');
+    try {
+      const res  = await fetch(API + '/api/visitors');
+      const data = await res.json();
+      renderHistory(data);
+    } catch (err) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Failed to load visitor history.</td></tr>';
+    }
+  }
+
+  // ── RENDER HISTORY TABLE ──
+  function renderHistory(data) {
+    const tbody = document.getElementById('historyTbody');
+
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No records found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(v => {
+      const badge = v.check_out
+        ? '<span class="badge checkedout">Checked Out</span>'
+        : '<span class="badge inside">Inside</span>';
+
+      return `
+        <tr>
+          <td>${v.visitor_id}</td>
+          <td>${v.visitor_name}</td>
+          <td>${v.purpose}</td>
+          <td>${v.resident_name}</td>
+          <td>${v.room_no}</td>
+          <td>${formatDateTime(v.check_in)}</td>
+          <td>${v.check_out ? formatDateTime(v.check_out) : badge}</td>
+          <td>
+            <button class="btn btn-danger" onclick="deleteVisitor(${v.visitor_id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ── CHECKOUT ──
+  async function checkout(id) {
+    if (!confirm('Mark this visitor as checked out?')) return;
+
+    try {
+      const res  = await fetch(API + '/api/visitors/' + id + '/checkout', { method: 'PUT' });
+      const data = await res.json();
+
+      if (res.ok) {
+        showMsg('currentMsg', 'Visitor checked out successfully.', 'success');
+        loadCurrent();
+        loadHistory();
+      } else {
+        showMsg('currentMsg', data.error || 'Checkout failed.', 'error');
+      }
+
+    } catch (err) {
+      showMsg('currentMsg', 'Network error. Is the backend running?', 'error');
+    }
+  }
+
+  // ── DELETE VISITOR ──
+  async function deleteVisitor(id) {
+    if (!confirm('Delete this visitor record permanently?')) return;
+
+    try {
+      const res  = await fetch(API + '/api/visitors/' + id, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (res.ok) {
+        showMsg('historyMsg', 'Visitor record deleted.', 'success');
+        loadCurrent();
+        loadHistory();
+      } else {
+        showMsg('historyMsg', data.error || 'Delete failed.', 'error');
+      }
+
+    } catch (err) {
+      showMsg('historyMsg', 'Network error. Is the backend running?', 'error');
+    }
+  }
+
+  // ── SEARCH ──
+  async function searchVisitors() {
+    const query = document.getElementById('searchInput').value.trim();
+
+    if (!query) {
+      loadHistory();
+      return;
+    }
+
+    const tbody = document.getElementById('historyTbody');
+    try {
+      const res  = await fetch(API + '/api/visitors/search?query=' + encodeURIComponent(query));
+      const data = await res.json();
+
+      if (!Array.isArray(data) || data.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No records match your search.</td></tr>';
+        return;
+      }
+
+      renderHistory(data);
+
+    } catch (err) {
+      showMsg('historyMsg', 'Search failed. Is the backend running?', 'error');
+    }
+  }
+
+  // ── CLEAR SEARCH ──
+  function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    loadHistory();
+  }
+
+  // Load both sections on page open
+  loadCurrent();
+  loadHistory();
+</script>
+
+</body>
+</html>

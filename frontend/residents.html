@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Residents — Hostel Visitor Log</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav>
+  <span class="brand">🏠 Hostel Visitor Log</span>
+  <a href="index.html">Dashboard</a>
+  <a href="residents.html" class="active">Residents</a>
+  <a href="checkin.html">Visitor Check-in</a>
+  <a href="visitors.html">Visitor Records</a>
+</nav>
+
+<div class="page">
+  <h1>Resident Management</h1>
+  <p class="subtitle">Add and manage hostel residents.</p>
+
+  <!-- ADD RESIDENT FORM -->
+  <div class="section">
+    <h2>Add Resident</h2>
+
+    <div id="formMsg" class="msg"></div>
+
+    <div class="form-row">
+      <input type="text" id="resName"   placeholder="Full name" />
+      <input type="text" id="resRoomNo" placeholder="Room number (e.g. A101)" />
+      <button class="btn btn-primary" onclick="addResident()">Add Resident</button>
+    </div>
+  </div>
+
+  <!-- RESIDENTS TABLE -->
+  <div class="section">
+    <h2>All Residents</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Room No.</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="residentsTbody">
+          <tr class="empty-row"><td colspan="4">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:3000';
+
+  function showMsg(id, text, type) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'msg ' + type + ' show';
+    setTimeout(() => { el.className = 'msg'; }, 4000);
+  }
+
+  // ── LOAD ALL RESIDENTS ──
+  async function loadResidents() {
+    const tbody = document.getElementById('residentsTbody');
+    try {
+      const res  = await fetch(API + '/api/residents');
+      const data = await res.json();
+
+      if (!Array.isArray(data) || data.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No residents found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(r => `
+        <tr>
+          <td>${r.resident_id}</td>
+          <td>${r.name}</td>
+          <td>${r.room_no}</td>
+          <td>
+            <button class="btn btn-danger" onclick="deleteResident(${r.resident_id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+
+    } catch (err) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">Failed to load residents.</td></tr>';
+    }
+  }
+
+  // ── ADD RESIDENT ──
+  async function addResident() {
+    const name    = document.getElementById('resName').value.trim();
+    const room_no = document.getElementById('resRoomNo').value.trim();
+
+    if (!name || !room_no) {
+      showMsg('formMsg', 'Please enter both name and room number.', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch(API + '/api/residents', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name, room_no })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        showMsg('formMsg', 'Resident added successfully!', 'success');
+        document.getElementById('resName').value   = '';
+        document.getElementById('resRoomNo').value = '';
+        loadResidents();
+      } else {
+        showMsg('formMsg', data.error || 'Failed to add resident.', 'error');
+      }
+
+    } catch (err) {
+      showMsg('formMsg', 'Network error. Is the backend running?', 'error');
+    }
+  }
+
+  // ── DELETE RESIDENT ──
+  async function deleteResident(id) {
+    // ← FIXED: removed claim that visitor records would be deleted
+    if (!confirm('Delete this resident? If they have visitor records, the deletion will be prevented.')) return;
+
+    try {
+      const res  = await fetch(API + '/api/residents/' + id, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (res.ok) {
+        showMsg('formMsg', 'Resident deleted.', 'success');
+        loadResidents();
+      } else {
+        showMsg('formMsg', data.error || 'Failed to delete resident.', 'error');
+      }
+
+    } catch (err) {
+      showMsg('formMsg', 'Network error. Is the backend running?', 'error');
+    }
+  }
+
+  // Load on page open
+  loadResidents();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hostel Visitor Log</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav>
+  <span class="brand">🏠 Hostel Visitor Log</span>
+  <a href="index.html" class="active">Dashboard</a>
+  <a href="residents.html">Residents</a>
+  <a href="checkin.html">Visitor Check-in</a>
+  <a href="visitors.html">Visitor Records</a>
+</nav>
+
+<div class="page">
+  <h1>Dashboard</h1>
+  <p class="subtitle">Hostel Visitor Log Management System — DBMS College Project</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">Total Residents</div>
+      <div class="count" id="countResidents">—</div>
+    </div>
+    <div class="card green">
+      <div class="label">Currently Inside</div>
+      <div class="count" id="countCurrent">—</div>
+    </div>
+    <div class="card orange">
+      <div class="label">Total Visitor Records</div>
+      <div class="count" id="countTotal">—</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Quick Navigation</h2>
+    <div class="quick-links">
+      <a href="residents.html">Manage Residents</a>
+      <a href="checkin.html">Record Visitor Check-in</a>
+      <a href="visitors.html">View Visitor Records</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:3000';
+
+  async function loadDashboard() {
+    try {
+      const [resRes, curRes, allRes] = await Promise.all([
+        fetch(API + '/api/residents'),
+        fetch(API + '/api/visitors/current'),
+        fetch(API + '/api/visitors')
+      ]);
+
+      const residents = await resRes.json();
+      const current   = await curRes.json();
+      const all       = await allRes.json();
+
+      document.getElementById('countResidents').textContent = Array.isArray(residents) ? residents.length : '—';
+      document.getElementById('countCurrent').textContent   = Array.isArray(current)   ? current.length   : '—';
+      document.getElementById('countTotal').textContent     = Array.isArray(all)        ? all.length        : '—';
+    } catch (err) {
+      console.error('Dashboard load error:', err);
+      document.getElementById('countResidents').textContent = 'err';
+      document.getElementById('countCurrent').textContent   = 'err';
+      document.getElementById('countTotal').textContent     = 'err';
+    }
+  }
+
+  loadDashboard();
+</script>
+
+</body>
+</html>
