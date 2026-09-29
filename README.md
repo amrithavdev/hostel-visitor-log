@@ -251,4 +251,4 @@ DBMS Lab Activity — B.Tech IT (2029 Batch)
 - Amritha V
 - Bala Aditya
 - Shafeeq Ahmad
--Sharon jayaseeli
+- Sharon jayaseeli
